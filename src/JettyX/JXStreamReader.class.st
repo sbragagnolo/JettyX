@@ -28,13 +28,10 @@ JXStreamReader >> findClassByName: aClassName ifNone: aBlockClosure [
 
 { #category : #'parsing-internal' }
 JXStreamReader >> installClassNamed: aClassName [
-	| symbolName | 
-	symbolName := (self classSymbolNameFor: aClassName).
-	
-	
-	(self class environment
-		includesKey:symbolName )
-		ifTrue: [ ^ symbolName asClass ].
+	| symbolName |
+	symbolName := self classSymbolNameFor: aClassName.
+	(self class environment includesKey: symbolName)
+		ifTrue: [ ^ self class environment at: symbolName ].
 	^ self commonSuperClass
 		subclass: (self classSymbolNameFor: aClassName)
 		instanceVariableNames: ''
@@ -161,4 +158,9 @@ JXStreamReader >> resolveWellKnownClass: aClassReference [
 		ifTrue: [ ^ Dictionary ].
 	aClassReference = 'array'
 		ifTrue: [ ^ JXArray ]
+]
+
+{ #category : #'parsing-internal' }
+JXStreamReader >> targetPackage [
+	^ 'VB6-ProleapMetaModel'
 ]
