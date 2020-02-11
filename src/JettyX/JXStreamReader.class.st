@@ -153,6 +153,16 @@ JXStreamReader >> parseString [
 ]
 
 { #category : #'parsing-internal' }
+JXStreamReader >> propertyAt: aPropertyName put: aValue forObject: aTargetObject [
+	(aTargetObject class slots
+		anySatisfy: [ :s | s name = aPropertyName ])
+		ifFalse: [ aTargetObject class addInstVarNamed: aPropertyName ].
+	(aTargetObject class slotNamed: aPropertyName)
+		write: aValue
+		to: aTargetObject
+]
+
+{ #category : #'parsing-internal' }
 JXStreamReader >> resolveWellKnownClass: aClassReference [
 	aClassReference = 'linked-hash-map'
 		ifTrue: [ ^ Dictionary ].
