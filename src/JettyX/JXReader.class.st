@@ -14,7 +14,7 @@ Class {
 JXReader >> classSymbolNameFor: aClassName [
 	| name |
 	name := ('.' split: aClassName) last copyReplaceAll: 'Impl' with: ''.
-	^ 'VB6' , name capitalized
+	^( 'VB6' , name capitalized) asSymbol 
 ]
 
 { #category : #'as yet unclassified' }
