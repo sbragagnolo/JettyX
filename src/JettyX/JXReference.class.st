@@ -32,3 +32,14 @@ JXReference >> isReference [
 JXReference >> reference: aCollection [ 
 	reference := aCollection
 ]
+
+{ #category : #'as yet unclassified' }
+JXReference >> refersToClass: aClassName [
+ __class := aClassName 
+]
+
+{ #category : #'as yet unclassified' }
+JXReference >> storeAt: aPropertyName put: aValue [ 
+	self assert: aPropertyName = '__class'.
+	__class := aValue. 
+]

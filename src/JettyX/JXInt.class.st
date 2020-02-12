@@ -1,14 +1,13 @@
 Class {
 	#name : #JXInt,
-	#superclass : #Object,
+	#superclass : #JXProtoObject,
 	#instVars : [
-		'value',
-		'__class'
+		'__value'
 	],
 	#category : #JettyX
 }
 
 { #category : #initialization }
 JXInt >> setValue: aValue [
-	value := aValue. 
+	__value := aValue. 
 ]

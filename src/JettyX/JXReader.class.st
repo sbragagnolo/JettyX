@@ -1,291 +1,332 @@
 Class {
 	#name : #JXReader,
-	#superclass : #Object,
+	#superclass : #STONReader,
 	#instVars : [
-		'objectRegistry',
-		'classRegistry',
-		'references',
-		'emptyObject'
+		'classRegistry'
 	],
 	#category : #JettyX
 }
 
-{ #category : #'as yet unclassified' }
+{ #category : #'parsing-internal' }
 JXReader >> classSymbolNameFor: aClassName [
 	| name |
 	name := ('.' split: aClassName) last copyReplaceAll: 'Impl' with: ''.
-	^( 'VB6' , name capitalized) asSymbol 
+	name := name copyReplaceAll: '$' with: 'GENERATED'.
+	name := name copyReplaceAll: '-' with: '_'.
+	^ ('VB6' , name capitalized) asSymbol
 ]
 
-{ #category : #'as yet unclassified' }
+{ #category : #'parsing-internal' }
 JXReader >> commonSuperClass [
-	^ Object
+	^ JXObject
 ]
 
-{ #category : #'as yet unclassified' }
-JXReader >> emptyObject [
-	^ emptyObject ifNil: [ emptyObject := Object new ]
-]
-
-{ #category : #'as yet unclassified' }
+{ #category : #'parsing-internal' }
 JXReader >> findClassByName: aClassName ifNone: aBlockClosure [
 	^ (self isWellKnownClass: aClassName)
 		ifTrue: [ self resolveWellKnownClass: aClassName ]
-		ifFalse: [ classRegistry at: aClassName ifAbsent: [ aBlockClosure value ] ]
+		ifFalse: [ classRegistry at: aClassName ifAbsentPut: [ aBlockClosure value ] ]
 ]
 
-{ #category : #'as yet unclassified' }
-JXReader >> findObjectId: anId ifNone: aBlockClosure [
-	^ objectRegistry at: anId ifAbsent: [ aBlockClosure value ]
-]
-
-{ #category : #'as yet unclassified' }
+{ #category : #'parsing-internal' }
 JXReader >> initialize [
 	super initialize.
-	objectRegistry := Dictionary new.
 	classRegistry := Dictionary new
 ]
 
-{ #category : #'as yet unclassified' }
+{ #category : #'parsing-internal' }
 JXReader >> installClassNamed: aClassName [
-	(self class environment
-		includesKey: (self classSymbolNameFor: aClassName))
-		ifTrue: [ self halt ].
+	| symbolName |
+	symbolName := self classSymbolNameFor: aClassName.
+	(self class environment includesKey: symbolName)
+		ifTrue: [ ^ self class environment at: symbolName ].
 	^ self commonSuperClass
-		subclass: (self classSymbolNameFor: aClassName)
+		subclass: symbolName
 		instanceVariableNames: ''
 		classVariableNames: ''
 		package: self targetPackage
 ]
 
-{ #category : #'as yet unclassified' }
-JXReader >> installObject: anObject onId: anInteger [
-	objectRegistry at: anInteger put: anObject.
-	^ anObject
-]
-
-{ #category : #'as yet unclassified' }
+{ #category : #'parsing-internal' }
 JXReader >> instantiate: aClassName [
 	^ (self
 		findClassByName: aClassName
 		ifNone: [ self installClassNamed: aClassName ]) new
 ]
 
-{ #category : #'as yet unclassified' }
-JXReader >> isEmptyObject: aCollection [
-	^ (aCollection isKindOf: Dictionary)
-		and: [ aCollection size = 1 and: [ aCollection includesKey: '@id' ] ]
+{ #category : #'parsing-internal' }
+JXReader >> isClassName: aName [
+	('.' split: aName) size > 1
+		ifTrue: [ ^ true ].
+	('-' split: aName) size > 1
+		ifTrue: [ ^ true ].
+	^ {'string' . 'int'} includes: aName
 ]
 
-{ #category : #'as yet unclassified' }
-JXReader >> isEnumReference: aCollection [
-	^ (aCollection includesKey: '@class')
-		and: [ aCollection includesKey: '$' ]
+{ #category : #'parsing-internal' }
+JXReader >> isClassReference: aName [
+	^ aName = '@class'
 ]
 
-{ #category : #'as yet unclassified' }
-JXReader >> isMetaAssociation: anAssociation [
-	^ {'@id' . '@class'} includes: anAssociation key
+{ #category : #'parsing-internal' }
+JXReader >> isIdReference: aName [
+	^ aName = '@id'
 ]
 
-{ #category : #'as yet unclassified' }
-JXReader >> isObjectDefinition: aDictionary [
-	^ (aDictionary isKindOf: Dictionary)
-		and: [ (aDictionary includesKey: '@id')
-				and: [ aDictionary includesKey: '@class' ] ]
+{ #category : #'parsing-internal' }
+JXReader >> isReferenceString: aName [
+	^ aName = '@reference'
 ]
 
-{ #category : #'as yet unclassified' }
-JXReader >> isObjectReference: aDictionary [
-	^ ((aDictionary isKindOf: Dictionary)
-		and: [ aDictionary size = 2
-				and: [ | classname |
-					classname := aDictionary keys
-						detect: [ :k | self isPossibleClassName: k ]
-						ifNone: [ nil ].
-					(classname isNil
-						and: [ (aDictionary includesKey: '@class')
-								and: [ aDictionary includesKey: '@reference' ] ])
-						ifTrue: [ ^ true ].
-					classname isNotNil
-						and: [ | sub |
-							sub := aDictionary at: classname.
-							sub isDictionary and: [ sub includesKey: '@reference' ] ] ] ]) or: [ aDictionary includesKey: '@reference'  ]
+{ #category : #'parsing-internal' }
+JXReader >> isWellKnownClass: aName [
+	^ (('-' split: aName) size > 1
+		or: [ {'string' . 'int'} includes: aName ])
+		and: [ (aName includesSubstring: '.') not ]
 ]
 
-{ #category : #'as yet unclassified' }
-JXReader >> isPossibleClassName: aName [
-	^ (aName includesSubstring: '.') or: [ aName = 'linked-hash-map' ]
+{ #category : #'parsing-internal' }
+JXReader >> parseMap [
+	| map |
+	map := STON mapClass new.
+	
+	self parseMapDo: [ :k :v |
+		| key value | 
+		key := k. 
+		value := v.	
+		
+		(self isReferenceString: key) ifTrue: [ 
+			map := JXReference index: value 	.
+		 ] ifFalse: [
+			(self isClassName: key) ifTrue: [  
+					| object |	
+					
+				value isReference ifTrue:[ object := value ] ifFalse: [
+					(value isKindOf: Array ) ifTrue: [  
+						object := JXCollection new.
+						value do: [ : dic | 
+							| oc |
+							
+							dic isReference ifTrue:[ dic refersToClass: key. object add: dic  ]ifFalse: [ oc := self instantiate: key.	
+							
+						(dic isKindOf: Dictionary) ifTrue: [
+							dic keysAndValuesDo: [ :nnnnn :vvvvv | self propertyAt: nnnnn put: vvvvv forObject: oc. ].
+						] ifFalse:[
+							oc setValue: dic.
+						].	
+							object add: oc. 
+							
+						]].
+						
+						
+					]ifFalse: [
+						key = '@defined-in' ifTrue: [  	object := self instantiate: value.	  ] ifFalse: [  	
+						object := self instantiate: key.	
+						 (value isKindOf: Dictionary) ifTrue: [
+							value keysAndValuesDo: [ :nnnnn :vvvvv | self propertyAt: nnnnn put: vvvvv forObject: object. ].
+						] ifFalse:[
+							object setValue: value.
+						].].
+						
+						
+					]
+				].
+					
+				self propertyAt: '__class' put: key forObject: object.
+				key := 'mapping__'.
+				value := object. 
+			] ifFalse: [
+				(self isClassReference: key) ifTrue: [  
+					| object |	
+					object := self instantiate: value. 
+					map keysAndValuesDo: [ :nnnnn : vvvvv | self propertyAt: nnnnn put: vvvvv forObject: object. ].
+					map := object. 
+				]
+			].
+		
+			self propertyAt: key put: value forObject: map.
+		].
+
+		
+	].
+	self storeReference: map.
+	^ map
 ]
 
-{ #category : #testing }
-JXReader >> isWellKnownClass: aClassName [
-	^ (aClassName indexOf: $.) = 0
+{ #category : #'parsing-internal' }
+JXReader >> parseMap2 [
+	| map association |
+	map := STON mapClass new.
+	association := nil. 
+	self expectChar: ${.
+	(self matchChar: $}) ifTrue: [ self storeReference: map. ^ map ].	"short cut for empty maps"
+		
+	[ readStream atEnd ] whileFalse: [ 
+	
+	| name value |
+			name := self parseSimpleValue.
+			self expectChar: $:.
+			(self isClassName: name) ifTrue: [ 
+					map := self parseObjectOfJavaClass: name.
+					self storeReference: map.
+					(association isNil and: [ self matchChar: $} ]) ifTrue: [ ^ map ]
+						ifFalse: [
+							 association ifNil: [ 
+								self storeReference: association. 
+									association := JXAssociation new. 
+									association map: map type: name.
+									map := nil 
+								] ifNotNil: [ 
+									association map: map type: name.
+									map := nil. 
+									^ association . 
+								] 
+						] 
+			].
+			(self isReferenceString: name) ifTrue: [ 
+				self assert: map isEmpty.
+					map := self parseXStreamReference: name.
+					self storeReference: map.
+					self assert: (self matchChar: $}).
+					^ map 
+				].
+			association ifNil: [
+				value := self parseValue.
+				(self isIdReference: name) ifTrue: [ 
+					name := 'id'.
+					value := value asNumber 
+				].
+				(self isClassReference: name) ifTrue: [ 
+					self assert: map isEmpty.
+					self expectChar: $,.
+					map := self parseObjectOfJavaClassInsideScope: value.
+					self storeReference: map.
+					^ map 
+				].
+			map at: name put: value.].
+			"The above is a more efficient way to say 'self parseValue' and using the returned association"
+			(self matchChar: $})
+				ifTrue: [ self storeReference: map.
+					^ map ].
+			self expectChar: $, ].
+	self error: 'end of map expected'.
+	^ map
 ]
 
-{ #category : #accessing }
-JXReader >> map: aStream to: anOtherStream [
-	[ aStream atEnd ]
-		whileFalse: [ anOtherStream nextPut: (self process: aStream next) ]
+{ #category : #'parsing-internal' }
+JXReader >> parseObjectOfJavaClass: aName [
+	| value array |
+	(self isWellKnownClass: aName)
+		ifTrue: [ ^ self resolveValueForClass: aName  ].
+	
+	(self matchChar:$[) ifTrue:  [ 
+			array := OrderedCollection new. 
+			self storeReference: array. 
+		[(self matchChar:$]) ] whileFalse:[
+			array add: (self parseObjectOfJavaClass: aName).
+		].
+		^ array.
+	].
+
+	self matchChar: ${.
+		value := self parseObjectOfJavaClassInsideScope: aName.
+		(value isKindOf: JXReference ) ifFalse: [ 
+		self expectChar: $}.
+	].
+	^ value
 ]
 
-{ #category : #accessing }
-JXReader >> object: anObjectId ofClass: aClassName [
-	^ self
-		findObjectId: anObjectId asInteger
-		ifNone: [ | instance |
-			instance := self instantiate: aClassName.
-			self installObject: instance onId: anObjectId asNumber ]
+{ #category : #'parsing-internal' }
+JXReader >> parseObjectOfJavaClassInsideScope: aName [
+	| object |
+	
+	
+	[ readStream atEnd ] whileFalse: [ | name value |
+		name := self parseSimpleValue.
+		self expectChar: $:.
+			(self isReferenceString: name) ifTrue: [ 
+				self assert: object isNil.
+					object := self parseXStreamReference: name.
+					self storeReference: object.
+					self assert: (self matchChar: $}).
+					^ object 
+				].
+		object ifNil:[  
+			object := self instantiate: aName.
+			self storeReference: object.
+		].
+		value := self parseValue.
+		self propertyAt: name put: value forObject: object.
+		"The above is a more efficient way to say 'self parseValue' and using the returned association"
+		(self matchChar: $}) ifTrue: [ ^ object ].
+		self expectChar: $, ].
+	
+	^ object
 ]
 
-{ #category : #accessing }
-JXReader >> process: aParsedObject [
-	^ aParsedObject beProcessedBy: self
+{ #category : #'parsing-internal' }
+JXReader >> parseXStreamReference: aReference [
+	| value |
+	value := self parseValue.
+	^ JXReference index: value
 ]
 
-{ #category : #'as yet unclassified' }
-JXReader >> processArray: anArray [
-	| typeSelector |
-	(anArray size = 1
-		and: [ (anArray first includesKey: '@id')
-				and: [ anArray first includesKey: 'entry' ] ])
-		ifTrue: [ | val relatedDictArray |
-			relatedDictArray := (anArray first at: #entry) isDictionary
-				ifTrue: [ {(anArray first at: #entry)} ]
-				ifFalse: [ anArray first at: #entry ].
-			val := (relatedDictArray first keys reject: [ :k | k = 'string' ])
-				first.
-			^ relatedDictArray
-				collect: [ :c | 
-					| aval |
-					c isDictionary
-						ifFalse: [ self halt ].
-					aval := (c at: val) isDictionary
-						ifTrue: [ {(c at: val)} ]
-						ifFalse: [ c at: val ].
-					aval do: [ :each | each at: '@class' put: val ].
-					(c at: 'string') -> (self process: aval) ] ]
-		ifFalse: [ (anArray size = 1 and: [ anArray first includesKey: '@id' ])
-				ifTrue: [ anArray first at: '@class' put: 'array'.
-					^ self process: anArray first ] ].
-	(anArray size = 1
-		and: [ (anArray first includesKey: '@id')
-				and: [ anArray first size = 2
-						and: [ typeSelector := (anArray first keys reject: [ :k | k = '@id' ])
-								first.
-							(anArray first at: typeSelector) isKindOf: Array ] ] ])
-		ifTrue: [ | val |
-			^ (anArray first at: typeSelector)
-				collect: [ :c | 
-					c at: '@class' put: typeSelector.
-					self process: c ] ].
-	^ anArray collect: [ :x | self process: x ]
-]
-
-{ #category : #'as yet unclassified' }
-JXReader >> processBoolean: aTrue [ 
-	^ aTrue 
-]
-
-{ #category : #'as yet unclassified' }
-JXReader >> processDictionary: aDictionary [
-	| relatedObject |
-	(self isObjectDefinition: aDictionary)
-		ifTrue: [ relatedObject := self processObjectDefinition: aDictionary ]
-		ifFalse: [ (self isEmptyObject: aDictionary)
-				ifTrue: [ relatedObject := self processEmptyObject: aDictionary ]
-				ifFalse: [ (self isObjectReference: aDictionary)
-						ifTrue: [ relatedObject := self processReference: aDictionary ]
-						ifFalse: [ (self isEnumReference: aDictionary)
-								ifTrue: [ relatedObject := self processEnumReference: aDictionary ]
-								ifFalse: [ self halt ] ] ] ].
-	^ relatedObject
-]
-
-{ #category : #'as yet unclassified' }
-JXReader >> processEmptyObject: aCollection [
-	^ objectRegistry
-		at: (aCollection at: '@id') asNumber
-		ifAbsentPut: [ self emptyObject ]
-]
-
-{ #category : #'as yet unclassified' }
-JXReader >> processEnumReference: aCollection [
-	^ references
-		at: aCollection
-		ifAbsentPut: [ JXEnumReference new
-				reference: aCollection;
-				yourself ]
-]
-
-{ #category : #'as yet unclassified' }
-JXReader >> processNumber: anInteger [ 
-	^ anInteger 
-]
-
-{ #category : #'as yet unclassified' }
-JXReader >> processObjectDefinition: aDictionary [
-	| relatedObject |
-	relatedObject := self
-		object: (aDictionary at: '@id')
-		ofClass: (aDictionary at: '@class').
-	aDictionary associations
-		reject: [ :a | self isMetaAssociation: a ]
-		thenDo: [ :a | 
-			(relatedObject isKindOf: JXArray)
-				ifTrue: [ | value |
-					(a value isArray not and: [ a value isDictionary not ])
-						ifTrue: [ relatedObject addAssociation: a key -> (self process: a value) ]
-						ifFalse: [ value := a value isDictionary
-								ifTrue: [ {a value} ]
-								ifFalse: [ a value ].
-							value first isDictionary
-								ifTrue: [ value
-										do: [ :aDict | 
-											(aDict includesKey: '@class')
-												ifTrue: [  ]
-												ifFalse: [ aDict at: '@class' put: a key ] ].
-									relatedObject addAssociation: a key -> (self process: value) ]
-								ifFalse: [ relatedObject
-										addAll: (value collect: [ :each | self process: each ]) ] ] ]
-				ifFalse: [ self
-						propertyAt: a key
-						put: (self process: a value)
-						forObject: relatedObject ] ].
-	^ relatedObject
-]
-
-{ #category : #'as yet unclassified' }
-JXReader >> processReference: aYetToProcess [
-	^ references
-		at: aYetToProcess
-		ifAbsentPut: [ JXReference on: aYetToProcess ]
-]
-
-{ #category : #'as yet unclassified' }
-JXReader >> processString: aString [ 
-	^ aString 
-]
-
-{ #category : #'as yet unclassified' }
+{ #category : #'parsing-internal' }
 JXReader >> propertyAt: aPropertyName put: aValue forObject: aTargetObject [
-	(aTargetObject class slots
-		anySatisfy: [ :s | s name = aPropertyName ])
-		ifFalse: [ aTargetObject class addInstVarNamed: aPropertyName ].
-	(aTargetObject class slotNamed: aPropertyName)
-		write: aValue
-		to: aTargetObject
+	| prop val |
+	prop := aPropertyName = '@id'
+		ifTrue: [ '__id' ]
+		ifFalse: [ aPropertyName ].
+	prop := prop = '@serialization'
+		ifTrue: [ '__serialization' ]
+		ifFalse: [ prop ].
+	prop := prop = '@class'
+		ifTrue: [ '__class' ]
+		ifFalse: [ prop ].
+	prop := prop = '$' ifTrue: [ 'enumValue' ] ifFalse: [prop].
+	val := (aValue isString and: [ aValue isAllDigits ])
+		ifTrue: [ aValue asNumber ]
+		ifFalse: [ aValue ].
+
+		
+	aTargetObject storeAt: aPropertyName put: aValue .
+	
+	
+"	(aTargetObject class allSlots anySatisfy: [ :s | s name = prop ])
+		ifFalse: [ aTargetObject class addInstVarNamed: prop ].
+	(aTargetObject class slotNamed: prop) write: val to: aTargetObject"
 ]
 
 { #category : #'as yet unclassified' }
+JXReader >> resolveValueForClass: aString [
+	aString = 'string'
+		ifTrue: [ ^ self parseValue ].
+	aString = 'int'
+		ifTrue: [ ^ self parseValue asNumber ].
+	self error: ' trying to resolve invalide type' , aString
+]
+
+{ #category : #'parsing-internal' }
 JXReader >> resolveWellKnownClass: aClassReference [
-( aClassReference = 'linked-hash-map') ifTrue: [ ^ JXDictionary ].
- ( aClassReference = 'array') ifTrue: [ ^ JXArray  ].
-( aClassReference = 'string') ifTrue: [ ^ JXString  ].
-self error:'not known' 
+	aClassReference = 'linked-hash-map'
+		ifTrue: [ ^ JXDictionary ].
+		aClassReference = 'linked-hash-set'
+		ifTrue: [ ^ JXSet ].
+	aClassReference = 'array'
+		ifTrue: [ ^ JXArray ].
+	aClassReference = 'string'
+		ifTrue: [ ^ JXString ].
+	aClassReference = 'int'
+		ifTrue: [ ^ JXInt ].
+	self error: 'not known'
 ]
 
-{ #category : #'as yet unclassified' }
+{ #category : #'parsing-internal' }
+JXReader >> storeReference: aMap [
+	^ super storeReference: aMap
+]
+
+{ #category : #'parsing-internal' }
 JXReader >> targetPackage [
 	^ 'VB6-ProleapMetaModel'
 ]

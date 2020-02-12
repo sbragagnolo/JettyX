@@ -4,3 +4,8 @@ Extension { #name : #Dictionary }
 Dictionary >> beProcessedBy: aJXReader [
 	^ aJXReader processDictionary: self
 ]
+
+{ #category : #'*JettyX' }
+Dictionary >> storeAt: aPropertyName put: aValue [ 
+	^ self at: aPropertyName put: aValue 
+]
