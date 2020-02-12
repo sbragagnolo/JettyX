@@ -1,10 +1,8 @@
 Class {
-	#name : #VB6ApiEnumeration,
+	#name : #VB6VisualBasic6ParserGENERATEDStartRuleContext,
 	#superclass : #JXObject,
 	#instVars : [
-		'constants',
-		'name',
-		'apiEnumerationCalls'
+		'invokingState'
 	],
 	#category : #'VB6-ProleapMetaModel'
 }

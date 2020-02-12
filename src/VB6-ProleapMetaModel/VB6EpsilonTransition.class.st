@@ -1,10 +1,9 @@
 Class {
-	#name : #VB6ApiEnumeration,
+	#name : #VB6EpsilonTransition,
 	#superclass : #JXObject,
 	#instVars : [
-		'constants',
-		'name',
-		'apiEnumerationCalls'
+		'outermostPrecedenceReturn',
+		'target'
 	],
 	#category : #'VB6-ProleapMetaModel'
 }

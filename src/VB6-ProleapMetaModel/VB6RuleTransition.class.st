@@ -1,10 +1,11 @@
 Class {
-	#name : #VB6ApiEnumeration,
+	#name : #VB6RuleTransition,
 	#superclass : #JXObject,
 	#instVars : [
-		'constants',
-		'name',
-		'apiEnumerationCalls'
+		'target',
+		'ruleIndex',
+		'precedence',
+		'followState'
 	],
 	#category : #'VB6-ProleapMetaModel'
 }

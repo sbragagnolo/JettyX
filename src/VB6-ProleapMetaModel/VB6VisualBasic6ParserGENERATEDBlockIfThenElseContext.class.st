@@ -1,5 +1,5 @@
 Class {
-	#name : #VB6ApiEnumerationRegistry,
+	#name : #VB6VisualBasic6ParserGENERATEDBlockIfThenElseContext,
 	#superclass : #JXObject,
 	#category : #'VB6-ProleapMetaModel'
 }

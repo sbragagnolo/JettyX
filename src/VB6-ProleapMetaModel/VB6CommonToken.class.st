@@ -1,14 +1,10 @@
 Class {
 	#name : #VB6CommonToken,
-	#superclass : #Object,
+	#superclass : #JXObject,
 	#instVars : [
-		'stop',
-		'line',
-		'index',
-		'charPositionInLine',
-		'start',
 		'type',
-		'source',
+		'line',
+		'charPositionInLine',
 		'channel'
 	],
 	#category : #'VB6-ProleapMetaModel'

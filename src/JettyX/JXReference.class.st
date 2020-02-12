@@ -2,10 +2,18 @@ Class {
 	#name : #JXReference,
 	#superclass : #Object,
 	#instVars : [
-		'reference'
+		'reference',
+		'__class'
 	],
 	#category : #JettyX
 }
+
+{ #category : #'as yet unclassified' }
+JXReference class >> index: aNumber [
+	^ self new
+		reference: aNumber asNumber;
+		yourself
+]
 
 { #category : #'as yet unclassified' }
 JXReference class >> on: aCollection [
@@ -13,6 +21,11 @@ JXReference class >> on: aCollection [
 	^ self new
 		reference: aCollection;
 		yourself
+]
+
+{ #category : #'as yet unclassified' }
+JXReference >> isReference [
+	^ true 
 ]
 
 { #category : #accessing }

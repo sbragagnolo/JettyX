@@ -279,8 +279,10 @@ JXReader >> propertyAt: aPropertyName put: aValue forObject: aTargetObject [
 
 { #category : #'as yet unclassified' }
 JXReader >> resolveWellKnownClass: aClassReference [
-( aClassReference = 'linked-hash-map') ifTrue: [ ^ Dictionary ].
+( aClassReference = 'linked-hash-map') ifTrue: [ ^ JXDictionary ].
  ( aClassReference = 'array') ifTrue: [ ^ JXArray  ].
+( aClassReference = 'string') ifTrue: [ ^ JXString  ].
+self error:'not known' 
 ]
 
 { #category : #'as yet unclassified' }
